@@ -1,0 +1,65 @@
+/* Design tokens from the "Key screens" design canvas. One light theme, high contrast, 44px touch targets. */
+:root {
+  color-scheme: light;
+
+  --ink: #15212c;
+  --ink-2: #3b4752;
+  --muted: #52606d;
+  --faint: #8a96a1;
+  --bg: #f2f4f6;
+  --surface: #ffffff;
+  --line: #e3e7eb;
+  --line-2: #d5dde3;
+  --line-3: #c9d1d8;
+  --brand: #0b6b58;
+  --brand-dark: #08503f;
+  --brand-tint: #e3f1ed;
+  --brand-tint-2: #f4faf8;
+  --brand-line: #9fcdc1;
+  --amber: #f0a23a;
+  --amber-ink: #8a4b00;
+  --amber-bg: #fdf0dc;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+  --night: #2a3a48;
+
+  --font-body: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Atkinson Hyperlegible', system-ui, sans-serif;
+
+  --radius: 16px;
+  --radius-sm: 12px;
+  --shadow: 0 1px 2px rgba(21, 33, 44, 0.06), 0 4px 16px rgba(21, 33, 44, 0.06);
+  --shadow-lg: 0 8px 32px rgba(21, 33, 44, 0.14);
+  --column: 560px;
+
+  /* Ionic */
+  --ion-font-family: var(--font-body);
+  --ion-background-color: var(--bg);
+  --ion-background-color-rgb: 242, 244, 246;
+  --ion-text-color: var(--ink);
+  --ion-text-color-rgb: 21, 33, 44;
+  --ion-border-color: var(--line);
+  --ion-toolbar-background: var(--surface);
+  --ion-item-background: var(--surface);
+
+  --ion-color-primary: #0b6b58;
+  --ion-color-primary-rgb: 11, 107, 88;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #08503f;
+  --ion-color-primary-tint: #237a69;
+
+  --ion-color-dark: #15212c;
+  --ion-color-dark-rgb: 21, 33, 44;
+  --ion-color-dark-contrast: #ffffff;
+  --ion-color-dark-contrast-rgb: 255, 255, 255;
+  --ion-color-dark-shade: #121d27;
+  --ion-color-dark-tint: #2c3741;
+
+  --ion-color-danger: #b42318;
+  --ion-color-danger-rgb: 180, 35, 24;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #9e1f15;
+  --ion-color-danger-tint: #bc392f;
+}
