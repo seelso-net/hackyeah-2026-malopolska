@@ -1,0 +1,52 @@
+# Local demo: the API plus PostgreSQL with pgvector.
+#   docker compose up --build        then open http://localhost:8080/q/swagger-ui
+#   ./scripts/demo-flow.sh           runs Maria's case end to end
+#
+# Every start reloads the demo data (DEMO_RESET=true). To keep your changes between restarts:
+#   DEMO_RESET=false docker compose up
+# LLM mode with OpenAI:
+#   AI_MODE=llm OPENAI_API_KEY=sk-... docker compose up
+# LLM mode with Ollama running on this machine:
+#   AI_MODE=llm OPENAI_BASE_URL=http://host.docker.internal:11434/v1/ OPENAI_API_KEY=ollama \
+#   CHAT_MODEL=qwen2.5:7b EMBEDDING_MODEL=bge-m3 docker compose up
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: needs
+      POSTGRES_USER: needs
+      POSTGRES_PASSWORD: needs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U needs -d needs"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/needs
+      DB_USER: needs
+      DB_PASSWORD: needs
+      DEMO_RESET: ${DEMO_RESET:-true}
+      AI_MODE: ${AI_MODE:-offline}
+      # Never pass empty values here: Quarkus treats an empty string as a missing required setting.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-not-set}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1/}
+      CHAT_MODEL: ${CHAT_MODEL:-gpt-4o-mini}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - media:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  media:

@@ -1,0 +1,20 @@
+# Java / Maven
+target/
+*.iml
+# Node / Vite
+node_modules/
+dist/
+*.local
+# Capacitor native builds
+app/android/app/build/
+app/android/.gradle/
+app/ios/App/Pods/
+# Local data and secrets
+data/
+.env
+.env.*
+!.env.example
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
