@@ -9,6 +9,9 @@ One platform fits a city district, a university campus or a housing co-op: categ
 roles and privacy rules are configuration, not code. Source code, database names and API keys are
 English; everything people read comes back in their language (Polish, English and Ukrainian in the demo).
 
+**Prezentacja (PL):** [PDF](docs/Neighbourhood-Needs-prezentacja.pdf) ·
+[PowerPoint](https://github.com/seelso-net/hackyeah-2026-malopolska/raw/main/docs/Neighbourhood-Needs-prezentacja.pptx)
+
 | Resident (phone) | | | Doer (phone) |
 | --- | --- | --- | --- |
 | ![Map of needs nearby](docs/screenshots/resident-map.png) | ![The AI's reading and a similar case](docs/screenshots/resident-review.png) | ![Did this help?](docs/screenshots/resident-did-it-help.png) | ![Doer checklist](docs/screenshots/doer-checklist.png) |
