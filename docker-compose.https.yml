@@ -1,0 +1,23 @@
+# HTTPS on your own server (phones only allow the microphone, camera and location over HTTPS).
+# Caddy gets a Let's Encrypt certificate for DOMAIN. No domain? Use your server's IP through sslip.io,
+# e.g. 203.0.113.7 -> 203-0-113-7.sslip.io. Ports 80 and 443 must be open.
+#
+#   DOMAIN=203-0-113-7.sslip.io docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+services:
+  app:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN to the server's domain name} --to app:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy-data:

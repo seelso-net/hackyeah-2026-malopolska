@@ -1,0 +1,54 @@
+# Render Blueprint: the app (web + API in one container) and PostgreSQL with pgvector, in Frankfurt.
+# One click: https://render.com/deploy?repo=https://github.com/seelso-net/hackyeah-2026-malopolska
+#
+# Both start on free plans. A free web service sleeps after 15 minutes without visitors and takes a
+# minute or two to wake up (the demo data is reloaded on every start). Before a presentation, switch
+# the web service to the 0.5 CPU / 512 MB instance in its Settings so it stays awake and starts faster.
+# A free database expires after 30 days.
+services:
+  - type: web
+    name: needs-platform
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /q/health/ready
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: needs-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: needs-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: needs-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: needs-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: needs-db
+          property: password
+      # Reload the demo data on every start; set to false to keep what people entered
+      - key: DEMO_RESET
+        value: "true"
+      # offline needs no key; for the LLM mode set AI_MODE=llm and OPENAI_API_KEY in the dashboard
+      - key: AI_MODE
+        value: offline
+      # Leave room for the JVM's own memory inside a 512 MB instance
+      - key: JAVA_OPTS
+        value: -XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+
+databases:
+  - name: needs-db
+    plan: free
+    region: frankfurt
+    databaseName: needs
+    user: needs
+    postgresMajorVersion: "16"

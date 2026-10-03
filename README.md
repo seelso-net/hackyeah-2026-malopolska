@@ -192,7 +192,7 @@ AI_MODE=llm OPENAI_BASE_URL=http://host.docker.internal:11434/v1/ OPENAI_API_KEY
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `DB_URL`, `DB_USER`, `DB_PASSWORD` | local `needs` database | PostgreSQL with pgvector (production profile) |
+| `DB_URL` (or `DB_HOST`, `DB_PORT`, `DB_NAME`), `DB_USER`, `DB_PASSWORD` | local `needs` database | PostgreSQL with pgvector (production profile) |
 | `DEMO_RESET` | `false` (`true` in Docker Compose) | Wipe the database at startup and reload the demo data |
 | `AI_MODE` | `offline` | `offline` or `llm` |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | none, OpenAI | Any OpenAI-compatible endpoint |
@@ -205,19 +205,34 @@ Matching thresholds live in `backend/src/main/resources/application.properties` 
 Each community's categories, status names, roles and rules (merge radius, map rounding, auto-close
 days, public map) live in its configuration JSON, editable on the admin screen.
 
-## Deploy to the cloud
+## Deploy
 
-The app is one container (the web app is served by the API) plus PostgreSQL with pgvector, which most
-managed offerings provide (for example Neon, Supabase, AWS RDS, Google Cloud SQL and Azure Database for
-PostgreSQL). Every push to `main` publishes the image to `ghcr.io/<owner>/<repo>:latest` (see CI below);
-or build it yourself from the `Dockerfile`. On the container host, set `DB_URL`, `DB_USER` and
-`DB_PASSWORD` (plus `DEMO_RESET=true` for a demo that resets on every restart), and point the health
-check at `/q/health/ready` (or `/q/health/started` for a startup probe). Photos go to local disk in
-`MEDIA_DIR`; mount a volume there, or swap `support/MediaStorage` for S3-compatible storage.
+The app is one container (the web app is served by the API) plus PostgreSQL with pgvector. Deploy it
+behind HTTPS: phones only allow the microphone, camera and location on secure sites.
+
+**Render (one click, free to start).**
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/seelso-net/hackyeah-2026-malopolska)
+
+`render.yaml` creates the web service and a PostgreSQL database in Frankfurt and wires them together;
+the first build takes about ten minutes. A free web service sleeps after 15 minutes without visitors and
+takes a minute or two to wake up (with the demo data reloaded), so before a presentation switch it to
+the 0.5 CPU instance in its Settings. A free database expires after 30 days.
+
+**Your own server.** Any Linux machine with Docker and ports 80 and 443 open; Caddy adds HTTPS
+(`<ip-with-dashes>.sslip.io` works when you have no domain):
 
 ```bash
-APP_IMAGE=ghcr.io/<owner>/<repo>:latest docker compose up --no-build   # the published image, no build
+git clone https://github.com/seelso-net/hackyeah-2026-malopolska && cd hackyeah-2026-malopolska
+DOMAIN=203-0-113-7.sslip.io docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
 ```
+
+**Any other container host** (Railway, Fly.io, Google Cloud Run, Azure Container Apps…): build the
+`Dockerfile`, or use the image CI publishes to `ghcr.io/<owner>/<repo>:latest`. Give it a PostgreSQL
+with pgvector (Neon and Supabase have free plans) through `DB_URL`, or `DB_HOST`, `DB_PORT` and
+`DB_NAME`, plus `DB_USER` and `DB_PASSWORD`; add `DEMO_RESET=true` for a demo that resets on every
+start. Point the health check at `/q/health/ready`, and run a single instance: live updates are held in
+memory. Photos go to local disk in `MEDIA_DIR`; mount a volume there, or swap `support/MediaStorage`
+for S3-compatible storage. The app needs about 300 MB of memory, so 512 MB instances are enough.
 
 A package published from a private repository is private too: run `docker login ghcr.io` on the host
 first, or make the package public in its GitHub settings.
