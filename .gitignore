@@ -5,6 +5,8 @@ target/
 node_modules/
 dist/
 *.local
+# The web app build, copied into the API by the Dockerfile (or by hand for a local single-server run)
+backend/src/main/resources/META-INF/resources/
 # Capacitor native builds
 app/android/app/build/
 app/android/.gradle/

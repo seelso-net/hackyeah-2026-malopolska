@@ -139,4 +139,4 @@ for who in maria ewa kasia; do
   events="$(grep -o '"type":"[A-Z_]*"' "$TMP/$who.sse" | cut -d'"' -f4 | grep -v -e HEARTBEAT -e CONNECTED | sort | uniq -c | awk '{printf "%s x%s, ", $2, $1}')"
   say "$who: ${events%, }"
 done
-bold "Done. Open $BASE/q/swagger-ui to try any step by hand."
+bold "Done. Open $BASE to see it in the app, or $BASE/q/swagger-ui to try any step by hand."

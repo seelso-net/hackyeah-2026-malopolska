@@ -1,5 +1,5 @@
-# Local demo: the API plus PostgreSQL with pgvector.
-#   docker compose up --build        then open http://localhost:8080/q/swagger-ui
+# Local demo: the app (web + API in one container) plus PostgreSQL with pgvector.
+#   docker compose up --build        then open http://localhost:8080 (API docs: /q/swagger-ui)
 #   ./scripts/demo-flow.sh           runs Maria's case end to end
 #
 # Every start reloads the demo data (DEMO_RESET=true). To keep your changes between restarts:
@@ -26,6 +26,8 @@ services:
 
   app:
     build: .
+    # Run a published image instead of building: APP_IMAGE=ghcr.io/<owner>/needs-platform:latest docker compose up --no-build
+    image: ${APP_IMAGE:-needs-platform:local}
     ports:
       - "8080:8080"
     environment:

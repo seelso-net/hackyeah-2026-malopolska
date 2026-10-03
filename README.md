@@ -1,37 +1,48 @@
-# Needs-to-Solutions Platform (API)
+# Needs-to-Solutions Platform
 
 Residents report problems by voice, text or photo. The AI groups similar reports into one case, finds a
 playbook that already worked in another community, and proposes who should act. A moderator approves,
 doers (city offices, NGOs, volunteers) work through a checklist, and residents confirm it helped. Each
 solved case improves the playbook, so the next community starts from a better recipe.
 
-The backend (`backend/`) is Quarkus 3.40 with PostgreSQL and pgvector, plus an AI layer that runs
-without any API key (offline mode) or with any OpenAI-compatible model (LLM mode). The browser and
-mobile app (`app/`, Ionic React with Capacitor) is in progress. Source code, database names and API
-keys are English; everything people read comes back in their language.
+One platform fits a city district, a university campus or a housing co-op: categories, status names,
+roles and privacy rules are configuration, not code. Source code, database names and API keys are
+English; everything people read comes back in their language (Polish, English and Ukrainian in the demo).
+
+| Resident (phone) | | | Doer (phone) |
+| --- | --- | --- | --- |
+| ![Map of needs nearby](docs/screenshots/resident-map.png) | ![The AI's reading and a similar case](docs/screenshots/resident-review.png) | ![Did this help?](docs/screenshots/resident-did-it-help.png) | ![Doer checklist](docs/screenshots/doer-checklist.png) |
+
+| Moderator: the AI's proposal, approved with one click | Moderator: the AI's next playbook version |
+| --- | --- |
+| ![Triage queue](docs/screenshots/moderator-queue.png) | ![Playbook draft](docs/screenshots/playbook-ai-draft.png) |
 
 ## Run it
 
 **Docker (easiest).** Needs Docker only.
 
 ```bash
-docker compose up --build          # API on http://localhost:8080, demo data loaded
-./scripts/demo-flow.sh             # Maria's case end to end (needs curl and jq)
+docker compose up --build          # http://localhost:8080, demo data loaded
 ```
 
-Open http://localhost:8080/q/swagger-ui to call any endpoint by hand. Every start reloads the demo
-data; `DEMO_RESET=false docker compose up` keeps your changes.
+Open http://localhost:8080 and pick a person (no passwords in the demo). Every start reloads the demo
+data; `DEMO_RESET=false docker compose up` keeps your changes. API docs: http://localhost:8080/q/swagger-ui.
 
-**Dev mode.** Needs JDK 21 and Docker (Quarkus starts PostgreSQL with pgvector for you).
+**Dev mode** (live reload for both). Needs JDK 21, Node 22 and Docker (Quarkus starts PostgreSQL with
+pgvector for you).
 
 ```bash
-cd backend
-./mvnw quarkus:dev                 # live reload; Dev UI at http://localhost:8080/q/dev-ui
+cd backend && ./mvnw quarkus:dev   # API on :8080, Dev UI at http://localhost:8080/q/dev-ui
+cd app && npm install && npm run dev   # app on http://localhost:5173, proxies /api to :8080
 ```
 
-**Plain JVM.** Needs JDK 21 and a PostgreSQL 15+ with the `vector` extension available.
+After changing the API, `npm run api:types` (in `app/`) regenerates the TypeScript types from `/q/openapi`.
+
+**Plain JVM.** Needs JDK 21, Node 22 and a PostgreSQL 15+ with the `vector` extension available.
 
 ```bash
+(cd app && npm ci && npm run build)
+mkdir -p backend/src/main/resources/META-INF/resources && cp -r app/dist/. backend/src/main/resources/META-INF/resources/
 cd backend && ./mvnw package
 DB_URL=jdbc:postgresql://localhost:5432/needs DB_USER=postgres DB_PASSWORD=postgres \
   java -jar target/quarkus-app/quarkus-run.jar
@@ -42,8 +53,21 @@ the startup AI work (vectors for the seed data, suggestions for waiting cases) i
 
 ## The demo
 
-Sign in by sending the header `X-Demo-User: <login>` (or `?as=<login>` where headers are impossible,
-such as `EventSource` and `<img>`). Add `?lang=pl|en|uk` to any call to switch the reader's language.
+Maria's case, end to end, takes about three minutes with two browser windows (or a phone and a laptop).
+
+1. **Maria** (resident, Polish, on a phone): tap **+ Zgłoś** and describe, typing or dictating, that her
+   84-year-old neighbour cannot leave a block without a lift. The AI reads it and finds case R-0412
+   nearby with 17 similar reports: **Dołącz do tej sprawy** (join this case).
+2. **Ewa** (moderator, English, desktop): the triage queue already holds the AI's proposal for R-0412:
+   the Stair Buddies playbook proven in Old Town, plus an NGO, the welfare office and volunteers who
+   live nearby. **Approve and assign**.
+3. **Kasia** (doer for Good Neighbours Foundation, Polish): accept, tick her checklist steps, write what
+   worked and mark **To rozwiązuje sprawę** (this resolves the case).
+4. **Maria**'s screen asks **Czy to pomogło?** (did this help?) without a reload: **Tak, pomogło**.
+5. **Ewa** opens the playbook: the AI drafted version 2 with the new step Kasia's team discovered.
+   **Publish version 2**: the next district to report this problem starts from a better recipe.
+6. **Piotr** (admin) shows that a campus or a co-op is just another configuration. **Ola** sees the
+   same map in Ukrainian.
 
 | Login | Who | Language |
 | --- | --- | --- |
@@ -60,24 +84,51 @@ Four communities show that one platform fits many shapes: `riverside` (city dist
 demo), `old-town` (where the Stair Buddies playbook was proven), `north-campus` (a university) and
 `oak-street-coop` (a housing co-op with its own status names and a members-only map).
 
-`scripts/demo-flow.sh` walks through the whole loop:
+`./scripts/demo-flow.sh` runs the same story through the REST API with curl and jq (`PAUSE=1` waits for
+Enter between steps, for presenting); restart the app first so the demo data is fresh.
 
-1. Maria reports in Polish that her neighbour cannot leave a block without a lift (`POST /api/reports`).
-2. The AI reads it and finds case R-0412 with 17 similar reports 48 m away; Maria joins it.
-3. Ewa's queue already holds the AI's proposal: the Stair Buddies playbook from Old Town, plus an NGO,
-   the welfare office and three volunteers who live nearby. She approves.
-4. Kasia accepts, ticks her checklist steps and posts what worked, marking the case resolved.
-5. Maria answers "Did this help?" with yes. The case closes and the AI drafts Stair Buddies v2 with the
-   new step Kasia's team discovered.
-6. Ewa publishes v2. Meanwhile every phone and browser received live events.
+## The app
 
-`PAUSE=1 ./scripts/demo-flow.sh` waits for Enter between steps, for presenting.
+`app/` is one Ionic React code base for the browser, an installable PWA and an Android app (Capacitor).
+Each person lands on their own surface:
+
+- **Residents**: a map of needs, ideas and initiatives nearby; "me too" and "I can help" on every
+  case; a two-step report (voice with live transcription, text, photos, location) with the AI's reading
+  and a similar case to join; case status with a progress stepper, updates and "did this help?"; my
+  reports; the ideas library (search by meaning); profile and language.
+- **Moderators**: triage queue sorted by urgency and support; each case with every report, a map, and
+  the AI's proposal (playbook, alternatives, doers with reasons, plus residents who offered help) to
+  approve as is or adjusted. On phones the side panel becomes a top bar.
+- **Doers**: new offers to accept, redirect or decline; active cases with their own checklist steps and
+  an update (with photos) for every resident on the case.
+- **Playbooks**: steps, who to involve, effort and results; AI drafts show what changed, with publish
+  and discard.
+- **Admins**: categories, status names, role descriptions and rules per community, with JSON import
+  and export.
+
+Everything updates live over server-sent events (toasts and the bell). Strings live in
+`app/src/i18n/{en,pl,uk}.ts` with proper plural forms; people's own text shows a "Machine translated ·
+Show original" switch when the AI translated it.
+
+**Android.** The API must be reachable from the phone (deployed, or your laptop's address on the same
+Wi-Fi). Needs Android Studio.
+
+```bash
+cd app
+VITE_API_URL=https://your-app.example.org npm run build && npx cap sync android && npx cap open android
+```
+
+Launcher icons and splash screens come from `app/assets/` (`npx @capacitor/assets generate --android`).
+
+**PWA.** Open the deployed site in Chrome or Safari and choose "Install" / "Add to Home Screen".
 
 ## API
 
 All paths start with `/api`; keys are English camelCase, enums travel as codes plus a translated label,
-and people's text arrives as `{text, lang, machineTranslated, original}`. Calls that start AI work
-return `202 Accepted`, and the result arrives on the event stream. Errors are `{status, error}`.
+and people's text arrives as `{text, lang, machineTranslated, original}`. Sign in by sending
+`X-Demo-User: <login>` (or `?as=<login>` where headers are impossible, such as `EventSource` and
+`<img>`); `X-Lang: pl|en|uk` (or `?lang=`) picks the reader's language. Calls that start AI work return
+`202 Accepted`, and the result arrives on the event stream. Errors are `{status, error}`.
 
 | Endpoint | Who | Does |
 | --- | --- | --- |
@@ -87,7 +138,10 @@ return `202 Accepted`, and the result arrives on the event stream. Errors are `{
 | `GET /reports/{id}` | author, moderators | What the AI understood and the closest open case |
 | `POST /reports/{id}/submit` | author | `{"caseId": …}` joins that case; no id opens a new one |
 | `GET /cases/{id}` | whoever can see the case | Timeline, who is helping, checklist, playbook used |
+| `POST /cases/{id}/support` | residents | "Me too" / "I support this idea"; idempotent |
+| `POST /cases/{id}/help-offers` | residents | "I can help" with an optional note; moderators see it next to the AI's picks |
 | `POST /cases/{id}/outcome` | linked residents | `HELPED` confirms the case; `NOT_HELPED` reopens it |
+| `GET /me/cases` | signed in | Cases I reported, joined, support or help with |
 | `GET /stream` | signed in | Server-sent events for everything the caller may see |
 | `GET /moderation/queue?community=` | moderators | Waiting cases by urgency then support, with AI status |
 | `GET /moderation/cases/{id}` | moderators | Every report, the timeline and the pending suggestion |
@@ -96,17 +150,20 @@ return `202 Accepted`, and the result arrives on the event stream. Errors are `{
 | `POST /assignments/{id}/accept` (`/decline`, `/redirect`) | the assigned doer | Decline and redirect take `{"note": …}` |
 | `PATCH /tasks/{id}` | accepted doers, moderators | `{"done": true}` ticks a checklist step |
 | `POST /cases/{id}/updates` | accepted doers, moderators | Text and photos for residents; `resolve=true` resolves |
+| `GET /playbooks?community=&q=` | anyone | The ideas library; `q` searches by meaning |
 | `GET /playbooks/{id or slug}` | anyone | Current version, waiting draft, results, history |
 | `POST /playbooks/{id}/versions/{n}/publish` | moderators | Makes the draft current; the old version is archived |
+| `DELETE /playbooks/{id}/versions/{n}` | moderators | Discards a draft |
 | `GET` / `PUT /admin/communities/{slug}/config` | admins | Export or import a community's whole configuration |
 
-Helpers outside the 18 demo endpoints: `GET /api/communities`, `GET /api/me`, `GET /api/media/{id}`,
-`/q/health`, `/q/swagger-ui` and `/q/openapi`.
+Also: `GET /api/communities`, `GET /api/me`, `GET /api/media/{id}`, `/q/health`, `/q/swagger-ui` and
+`/q/openapi`.
 
 Live event types: `REPORT_PROCESSED`, `SAFETY_ALERT`, `REPORT_ADDED`, `STATUS_CHANGED`,
 `MATCH_SUGGESTED`, `MATCH_APPROVED`, `ASSIGNMENT_ACCEPTED`, `ASSIGNMENT_DECLINED`, `TASK_UPDATED`,
-`UPDATE_POSTED`, `OUTCOME_RECORDED`, `PLAYBOOK_DRAFTED`, `PLAYBOOK_PUBLISHED`, `CONFIG_CHANGED`, plus
-`CONNECTED` and a `HEARTBEAT` every 20 s. Each carries ids and codes; the UI writes the sentence.
+`UPDATE_POSTED`, `CASE_SUPPORTED`, `HELP_OFFERED`, `OUTCOME_RECORDED`, `PLAYBOOK_DRAFTED`,
+`PLAYBOOK_PUBLISHED`, `CONFIG_CHANGED`, plus `CONNECTED` and a `HEARTBEAT` every 20 s. Each carries ids
+and codes; the app writes the sentence in the reader's language.
 
 ## AI modes
 
@@ -142,41 +199,71 @@ AI_MODE=llm OPENAI_BASE_URL=http://host.docker.internal:11434/v1/ OPENAI_API_KEY
 | `CHAT_MODEL`, `EMBEDDING_MODEL` | `gpt-4o-mini`, `text-embedding-3-small` | Model names at that endpoint |
 | `MEDIA_DIR` | `data/media` | Where photos and voice notes are stored |
 | `PORT` | `8080` | HTTP port (cloud platforms set it) |
+| `VITE_API_URL` (app build) | same origin | The API's address, for the Android app or a separately hosted web app |
 
-Matching thresholds live in `backend/src/main/resources/application.properties` (`app.matching.*`). Each community's categories,
-status names, roles and rules (merge radius, map rounding, auto-close days, public map) live in its
-configuration JSON, editable through the admin endpoint.
+Matching thresholds live in `backend/src/main/resources/application.properties` (`app.matching.*`).
+Each community's categories, status names, roles and rules (merge radius, map rounding, auto-close
+days, public map) live in its configuration JSON, editable on the admin screen.
 
 ## Deploy to the cloud
 
-The app is one container plus PostgreSQL with pgvector, which most managed offerings provide (for
-example Neon, Supabase, AWS RDS, Google Cloud SQL and Azure Database for PostgreSQL). Build with the
-`Dockerfile`, set `DB_URL`, `DB_USER` and `DB_PASSWORD`, and point the platform's health check at
-`/q/health/ready` (or `/q/health/started` for a startup probe). Photos go to local disk in `MEDIA_DIR`;
-mount a volume there, or swap `support/MediaStorage` for S3-compatible storage.
+The app is one container (the web app is served by the API) plus PostgreSQL with pgvector, which most
+managed offerings provide (for example Neon, Supabase, AWS RDS, Google Cloud SQL and Azure Database for
+PostgreSQL). Every push to `main` publishes the image to `ghcr.io/<owner>/<repo>:latest` (see CI below);
+or build it yourself from the `Dockerfile`. On the container host, set `DB_URL`, `DB_USER` and
+`DB_PASSWORD` (plus `DEMO_RESET=true` for a demo that resets on every restart), and point the health
+check at `/q/health/ready` (or `/q/health/started` for a startup probe). Photos go to local disk in
+`MEDIA_DIR`; mount a volume there, or swap `support/MediaStorage` for S3-compatible storage.
+
+```bash
+APP_IMAGE=ghcr.io/<owner>/<repo>:latest docker compose up --no-build   # the published image, no build
+```
+
+A package published from a private repository is private too: run `docker login ghcr.io` on the host
+first, or make the package public in its GitHub settings.
+
+## Tests and CI
+
+```bash
+cd backend && ./mvnw test                         # unit tests: offline AI rules, similarity, text flags, labels
+./scripts/demo-flow.sh                            # the API story against a fresh app
+python app/e2e/click_through.py                   # every screen, every role, with screenshots (Playwright)
+python app/e2e/navigation.py                      # links, typed addresses, back and forward
+```
+
+`.github/workflows/ci.yml` runs the unit tests and the app build on every push and pull request, then
+builds the Docker image, starts it with PostgreSQL and runs all three end-to-end checks against it
+(screenshots are kept as a build artifact). Pushes to `main` then publish the image.
 
 ## Code map
 
 ```
 backend/src/main/java/app/needs/
-  model/     entities (Panache), enums, JSON value types such as LocalizedText and CommunityConfig
-  ai/        Ai facade, OfflineAi, LlmAi and the langchain4j AI services in ai/llm
-  service/   intake, matching, cases, assignments, playbooks, vectors, translations, background jobs
-  api/       REST resources, view models (CaseViews), access rules (Access)
-  support/   demo login, reader's language, live events, media storage, after-commit hooks
-backend/src/main/resources/db/migration/   V1 schema, V2 demo data
-scripts/demo-flow.sh                       the scripted demo
+  model/      entities (Panache), enums, JSON value types such as LocalizedText and CommunityConfig
+  ai/         Ai facade, OfflineAi, LlmAi and the langchain4j AI services in ai/llm
+  service/    intake, matching, cases, volunteers, assignments, playbooks, vectors, translations, jobs
+  api/        REST resources, view models (CaseViews), access rules (Access)
+  support/    demo login, reader's language, live events, media storage, web app routing
+backend/src/main/resources/db/migration/    V1 schema, V2 demo data
+app/src/
+  api/        typed client (openapi-fetch) and the types generated from /q/openapi
+  session/    who is signed in, language, community; queries scoped to all three
+  live/       the event stream: refreshes what changed, shows notices
+  pages/      resident/, moderator/, doer/, playbook/, admin/, sign-in
+  components/ map, stepper, timeline, tags, navigation, panel layout
+  i18n/       en, pl, uk
+app/android/  the Capacitor Android project
+app/e2e/      browser checks (Playwright)
+scripts/      demo-flow.sh (the API story), wait-ready.sh
 ```
-
-`cd backend && ./mvnw test` runs the unit tests (offline AI rules, similarity, translated-text flags, status labels,
-map rounding); the demo script is the end-to-end test.
 
 ## Known limits
 
 - Demo login only: replace `support/CurrentUser` with `quarkus-oidc` before real residents use it.
 - The live event hub is in memory, so run one instance (or move it to Redis or Postgres `LISTEN/NOTIFY`).
-- Voice notes are stored, not transcribed: the phone sends its own transcript as `text` (for example
-  from the Web Speech API).
-- The 10 MVP endpoints from the design are not built yet: "me too" support, help offers, my cases,
-  rejecting a suggestion, editing and merging cases, playbook search, editing and discarding drafts,
-  and the doer directory.
+- Voice notes are stored, not transcribed on the server: the app sends the browser's live transcript
+  (Web Speech API, in Chrome and Safari) as the report text.
+- Offline mode does not translate: the seeded content is in English and Polish, so Ukrainian readers
+  see those originals until `AI_MODE=llm` is on.
+- Not built yet from the MVP design: rejecting a suggestion, editing and merging cases, editing playbook
+  drafts by hand, and a doer directory.
