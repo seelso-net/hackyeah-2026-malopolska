@@ -263,7 +263,8 @@ scripts/      demo-flow.sh (the API story), wait-ready.sh
 - The live event hub is in memory, so run one instance (or move it to Redis or Postgres `LISTEN/NOTIFY`).
 - Voice notes are stored, not transcribed on the server: the app sends the browser's live transcript
   (Web Speech API, in Chrome and Safari) as the report text.
-- Offline mode does not translate: the seeded content is in English and Polish, so Ukrainian readers
-  see those originals until `AI_MODE=llm` is on.
+- Offline mode does not translate: new reports and updates reach other readers in the language they
+  were written in (the seeded map and playbook summaries are written in all three languages).
+  `AI_MODE=llm` translates them.
 - Not built yet from the MVP design: rejecting a suggestion, editing and merging cases, editing playbook
   drafts by hand, and a doer directory.
