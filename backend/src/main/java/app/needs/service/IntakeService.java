@@ -4,8 +4,6 @@ import app.needs.ai.Ai;
 import app.needs.ai.AiTypes.AnalysisInput;
 import app.needs.ai.AiTypes.ReportAnalysis;
 import app.needs.ai.TextTools;
-import app.needs.model.Actor;
-import app.needs.model.ActorKind;
 import app.needs.model.AiResult;
 import app.needs.model.AppUser;
 import app.needs.model.CaseEventType;
@@ -16,12 +14,10 @@ import app.needs.model.InputMode;
 import app.needs.model.LocalizedText;
 import app.needs.model.MediaAsset;
 import app.needs.model.MediaKind;
-import app.needs.model.Membership;
 import app.needs.model.ParticipantRole;
 import app.needs.model.Report;
 import app.needs.model.ReportKind;
 import app.needs.model.ReportStatus;
-import app.needs.model.Role;
 import app.needs.model.Urgency;
 import app.needs.model.Visibility;
 import app.needs.service.VectorSearch.CaseHit;
@@ -35,8 +31,6 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +73,9 @@ public class IntakeService {
 
     @Inject
     EmbeddingService embeddings;
+
+    @Inject
+    VolunteerService volunteers;
 
     public record NewReport(ReportKind kind, String text, Double lat, Double lng, String address, boolean anonymous) {
     }
@@ -212,7 +209,7 @@ public class IntakeService {
         Urgency urgency = in.urgency() != null ? in.urgency() : reading.urgency();
 
         if (r.kind == ReportKind.OFFER) {
-            recordOffer(user, r, category);
+            volunteers.offer(user, community, category, r.lat, r.lng, r.body);
             r.status = ReportStatus.SUBMITTED;
             return new SubmitResult(null, "OFFER_RECORDED");
         }
@@ -280,41 +277,4 @@ public class IntakeService {
         return LocalizedText.of(TextTools.detectLanguage(text), text.trim());
     }
 
-    /** "I can help": the resident becomes (or updates) a volunteer doer the matcher can propose. */
-    private void recordOffer(AppUser user, Report r, String category) {
-        Actor a = Actor.find("user.id = ?1 and community.id = ?2", user.id, r.community.id).firstResult();
-        if (a == null) {
-            a = new Actor();
-            a.community = r.community;
-            a.kind = ActorKind.VOLUNTEER;
-            a.name = user.displayName;
-            a.user = user;
-            a.capabilities = category == null ? new String[0] : new String[] {category};
-            a.serviceLat = r.lat;
-            a.serviceLng = r.lng;
-            a.serviceRadiusM = 1000;
-            a.description = r.body;
-            a.persist();
-            boolean isDoer = Membership.count("user.id = ?1 and community.id = ?2 and role = ?3",
-                    user.id, r.community.id, Role.DOER) > 0;
-            if (!isDoer) {
-                Membership m = new Membership();
-                m.user = user;
-                m.community = r.community;
-                m.role = Role.DOER;
-                m.actor = a;
-                m.persist();
-            }
-        } else {
-            List<String> caps = new ArrayList<>(Arrays.asList(a.capabilities));
-            if (category != null && !caps.contains(category)) {
-                caps.add(category);
-            }
-            a.capabilities = caps.toArray(String[]::new);
-            a.description = r.body;
-            a.embedding = null;
-        }
-        UUID actorId = a.id;
-        afterCommit.async(() -> embeddings.refreshActor(actorId));
-    }
 }

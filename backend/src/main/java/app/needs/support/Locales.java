@@ -10,8 +10,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Picks the reader's language for a community: ?lang= (handy for demos), the user's saved locale,
- * Accept-Language, then the community default. Only languages the community lists are used.
+ * Picks the reader's language for a community: ?lang= or the X-Lang header (the app's language switch),
+ * the user's saved locale, Accept-Language, then the community default. Only languages the community lists are used.
  */
 @RequestScoped
 public class Locales {
@@ -25,6 +25,9 @@ public class Locales {
     public String pick(Community community) {
         List<String> supported = community.localeList();
         String explicit = request.getParam("lang");
+        if (explicit == null) {
+            explicit = request.getHeader("X-Lang");
+        }
         if (explicit != null && supported.contains(explicit)) {
             return explicit;
         }

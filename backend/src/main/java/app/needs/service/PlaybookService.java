@@ -202,6 +202,25 @@ public class PlaybookService {
         return false;
     }
 
+    /** Throws the draft away; a playbook that only ever had this draft goes with it. */
+    @Transactional
+    public void discard(Set<UUID> moderatedCommunities, UUID playbookId, int number) {
+        PlaybookVersion v = PlaybookVersion.<PlaybookVersion>find("playbook.id = ?1 and number = ?2", playbookId, number)
+                .firstResultOptional()
+                .orElseThrow(() -> Problems.notFound("Version " + number + " not found."));
+        if (!canPublish(v, moderatedCommunities)) {
+            throw Problems.forbidden("Only moderators of the playbook's community, or of the community whose case drafted it, can discard.");
+        }
+        if (v.status != PlaybookStatus.DRAFT) {
+            throw Problems.conflict("Only drafts can be discarded; version " + number + " is " + v.status + ".");
+        }
+        Playbook p = v.playbook;
+        v.delete();
+        if (PlaybookVersion.count("playbook.id", p.id) == 0) {
+            p.delete();
+        }
+    }
+
     @Transactional
     public PlaybookVersion publish(AppUser user, Set<UUID> moderatedCommunities, UUID playbookId, int number) {
         Playbook p = Playbook.<Playbook>findByIdOptional(playbookId).orElseThrow(() -> Problems.notFound("Playbook not found."));

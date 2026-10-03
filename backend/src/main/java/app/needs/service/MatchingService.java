@@ -140,6 +140,18 @@ public class MatchingService {
         workflow.event(c, CaseEventType.MATCH_SUGGESTED, null, null, Visibility.MODERATORS, null, data);
     }
 
+    /** Roles are listed in order of who leads the step: an NGO step with volunteers goes to the NGO. */
+    private static CaseAssignment ownerFor(PlaybookStep step, List<CaseAssignment> assignments) {
+        for (String role : step.roles()) {
+            for (CaseAssignment a : assignments) {
+                if (a.actor.kind.name().equals(role)) {
+                    return a;
+                }
+            }
+        }
+        return null;
+    }
+
     /** The moderator's decision: assignments for the chosen doers and a checklist from the playbook steps. */
     @Transactional
     public CaseFile approve(AppUser moderator, UUID suggestionId, Approval in) {
@@ -195,10 +207,7 @@ public class MatchingService {
                 t.caseFile = c;
                 t.position = step.position();
                 t.title = step.title();
-                t.assignment = assignments.stream()
-                        .filter(a -> step.roles().contains(a.actor.kind.name()))
-                        .findFirst()
-                        .orElse(null);
+                t.assignment = ownerFor(step, assignments);
                 t.persist();
             }
         }

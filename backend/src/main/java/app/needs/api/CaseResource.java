@@ -16,6 +16,9 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.RestPath;
@@ -36,7 +39,16 @@ public class CaseResource {
     @Inject
     CaseService cases;
 
+    @Inject
+    OptionalBody optional;
+
     public record OutcomeBody(Outcome outcome) {
+    }
+
+    public record HelpOfferBody(String note) {
+    }
+
+    public record HelpOffer(UUID caseId, UUID actorId, String actorName) {
     }
 
     public record UpdateBody(String text, boolean resolve) {
@@ -48,6 +60,35 @@ public class CaseResource {
     @Operation(summary = "Case status: timeline, who is helping, the checklist and the playbook used")
     public CaseViews.CaseDetail get(@RestPath UUID id) {
         return views.detail(access.requireSee(CaseService.find(id)));
+    }
+
+    @POST
+    @Path("/{id}/support")
+    @Transactional
+    @Tag(name = "Residents")
+    @Operation(summary = "\"Me too\": backs the case without writing a report; the caller follows it from now on")
+    public CaseViews.CaseDetail support(@RestPath UUID id) {
+        AppUser user = current.require();
+        CaseFile c = access.requireSee(CaseService.find(id));
+        access.ensureResident(user, c.community);
+        return views.detail(cases.support(user, id));
+    }
+
+    @POST
+    @Path("/{id}/help-offers")
+    @Consumes(MediaType.WILDCARD)
+    @Transactional
+    @Tag(name = "Residents")
+    @RequestBody(content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = HelpOfferBody.class)))
+    @Operation(summary = "\"I can help\": the caller becomes a volunteer near the case; moderators see the offer "
+            + "and can add them when they approve the match. Optional {\"note\": \"...\"}")
+    public HelpOffer offerHelp(@RestPath UUID id, String json) {
+        AppUser user = current.require();
+        CaseFile c = access.requireSee(CaseService.find(id));
+        access.ensureResident(user, c.community);
+        HelpOfferBody body = optional.read(json, HelpOfferBody.class);
+        var actor = cases.offerHelp(user, id, body == null ? null : body.note());
+        return new HelpOffer(id, actor.id, actor.name);
     }
 
     @POST

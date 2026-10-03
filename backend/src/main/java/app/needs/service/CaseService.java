@@ -1,6 +1,7 @@
 package app.needs.service;
 
 import app.needs.ai.TextTools;
+import app.needs.model.Actor;
 import app.needs.model.AppUser;
 import app.needs.model.AssignmentStatus;
 import app.needs.model.CaseAssignment;
@@ -13,8 +14,11 @@ import app.needs.model.LocalizedText;
 import app.needs.model.MediaAsset;
 import app.needs.model.MediaKind;
 import app.needs.model.Outcome;
+import app.needs.model.ParticipantRole;
 import app.needs.model.Visibility;
 import app.needs.support.AfterCommit;
+import app.needs.support.LiveEvents;
+import app.needs.support.LiveEvents.LiveEvent;
 import app.needs.support.MediaStorage;
 import app.needs.support.MediaStorage.StoredFile;
 import app.needs.support.Problems;
@@ -47,6 +51,53 @@ public class CaseService {
 
     @Inject
     TranslationService translations;
+
+    @Inject
+    VolunteerService volunteers;
+
+    @Inject
+    LiveEvents live;
+
+    /** "Me too": the resident backs the case without writing a report. Idempotent. */
+    @Transactional
+    public CaseFile support(AppUser user, UUID caseId) {
+        CaseFile c = find(caseId);
+        if (!c.status.isOpen()) {
+            throw Problems.conflict("This case is closed.");
+        }
+        if (CaseParticipant.of(caseId, user.id).isEmpty()) {
+            workflow.addParticipant(c, user, ParticipantRole.SUPPORTER);
+            c.supporterCount++;
+            LiveEvent event = new LiveEvent("CASE_SUPPORTED", c.community.id, c.id, null, Visibility.PUBLIC, Set.of(),
+                    Set.of(), Map.of("supporterCount", c.supporterCount), Instant.now());
+            afterCommit.sync(() -> live.publish(event));
+        }
+        return c;
+    }
+
+    /**
+     * "I can help": the resident becomes a volunteer near the case, follows it, and moderators see the offer
+     * (they can add the volunteer when they approve the match).
+     */
+    @Transactional
+    public Actor offerHelp(AppUser user, UUID caseId, String note) {
+        CaseFile c = find(caseId);
+        if (!c.status.isOpen()) {
+            throw Problems.conflict("This case is closed.");
+        }
+        LocalizedText description = note == null || note.isBlank()
+                ? c.title : LocalizedText.of(TextTools.detectLanguage(note), note.trim());
+        Actor a = volunteers.offer(user, c.community, c.categoryCode, c.lat, c.lng, description);
+        workflow.addParticipant(c, user, ParticipantRole.FOLLOWER);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("actorId", a.id.toString());
+        data.put("actorName", a.name);
+        if (note != null && !note.isBlank()) {
+            data.put("note", note.trim());
+        }
+        workflow.event(c, CaseEventType.HELP_OFFERED, user, a, Visibility.MODERATORS, null, data);
+        return a;
+    }
 
     public static CaseFile find(UUID caseId) {
         return CaseFile.<CaseFile>findByIdOptional(caseId).orElseThrow(() -> Problems.notFound("Case not found."));
